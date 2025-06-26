@@ -1,0 +1,56 @@
+# Render.com Configuration for Pow_CRM Antpool Data Extractor
+# This file defines the web service configuration for deployment
+
+services:
+  # Main web service (required for cron jobs to work)
+  - type: web
+    name: pow-crm-antpool
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python health_check.py && python -c "print('🚀 Pow_CRM Service Running - Cron jobs will handle data collection'); import time; time.sleep(86400)"
+    plan: starter  # $7/month plan
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      # The following environment variables must be set manually in Render.com dashboard:
+      # ANTPOOL_API_KEY - Your Antpool API key
+      # ANTPOOL_API_SECRET - Your Antpool API secret  
+      # ANTPOOL_USER_ID - Your main Antpool user ID
+      # SUPABASE_CONNECTION_STRING - Your Supabase PostgreSQL connection string
+      # ANTPOOL_EMAIL - Your email (optional, for sub-accounts)
+      # ANTPOOL_COINS - Coins to monitor (default: BTC)
+
+# =====================================================
+# CRON JOBS CONFIGURATION
+# =====================================================
+# These cron jobs must be configured manually in Render.com dashboard:
+#
+# 1. Tier 1 - Dashboard Essentials (Every 10 minutes)
+#    Name: tier1-dashboard
+#    Command: python collect_tier1.py
+#    Schedule: */10 * * * *
+#
+# 2. Tier 2 - Complete Worker Data (Every hour)
+#    Name: tier2-workers  
+#    Command: python collect_tier2.py
+#    Schedule: 0 * * * *
+#
+# 3. Tier 3 - Daily Financial Data (Daily at 2 AM)
+#    Name: tier3-financial
+#    Command: python collect_tier3.py
+#    Schedule: 0 2 * * *
+#
+# 4. Tier 4 - Data Cleanup (Daily at 3 AM)
+#    Name: tier4-cleanup
+#    Command: python collect_tier4.py
+#    Schedule: 0 3 * * *
+#
+# =====================================================
+# DEPLOYMENT NOTES
+# =====================================================
+# 1. The web service runs continuously to support cron jobs
+# 2. Health check runs on startup to validate configuration
+# 3. Actual data collection happens via scheduled cron jobs
+# 4. Logs are available in Render.com dashboard for monitoring
+# 5. Service will restart automatically if it crashes
+
