@@ -1,0 +1,37 @@
+name: Tier 4 - Daily Data Cleanup
+
+on:
+  schedule:
+    # Runs daily at 3:00 AM UTC
+    - cron: '0 3 * * *'
+  workflow_dispatch:  # Allows manual triggering
+
+jobs:
+  cleanup-old-data:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Run Tier 4 cleanup
+      run: python collect_tier4.py
+      env:
+        ANTPOOL_ACCESS_KEY: ${{ secrets.ANTPOOL_ACCESS_KEY }}
+        ANTPOOL_SECRET_KEY: ${{ secrets.ANTPOOL_SECRET_KEY }}
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        
+    - name: Log completion
+      run: echo "Tier 4 data cleanup completed at $(date)"
+
