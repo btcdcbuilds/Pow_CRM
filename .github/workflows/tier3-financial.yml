@@ -30,9 +30,8 @@ jobs:
         ANTPOOL_API_KEY: ${{ secrets.ANTPOOL_ACCESS_KEY }}
         ANTPOOL_API_SECRET: ${{ secrets.ANTPOOL_SECRET_KEY }}
         ANTPOOL_USER_ID: ${{ secrets.ANTPOOL_USER_ID }}
-        ANTPOOL_EMAIL: ${{ secrets.ANTPOOL_EMAIL }}
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-        SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         
     - name: Log completion
       run: echo "Tier 3 financial data collection completed at $(date)"
