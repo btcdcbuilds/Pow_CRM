@@ -27,8 +27,8 @@ jobs:
     - name: Run Tier 4 cleanup
       run: python collect_tier4.py
       env:
-        ANTPOOL_API_KEY: ${{ secrets.ANTPOOL_ACCESS_KEY }}
-        ANTPOOL_API_SECRET: ${{ secrets.ANTPOOL_SECRET_KEY }}
+        ANTPOOL_ACCESS_KEY: ${{ secrets.ANTPOOL_ACCESS_KEY }}
+        ANTPOOL_SECRET_KEY: ${{ secrets.ANTPOOL_SECRET_KEY }}
         ANTPOOL_USER_ID: ${{ secrets.ANTPOOL_USER_ID }}
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
