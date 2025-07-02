@@ -45,7 +45,7 @@ class AntpoolAuth:
             Dictionary containing authentication parameters
         """
         user_id = user_id or self.user_id
-        nonce = nonce or str(int(time.time()))
+        nonce = nonce or str(int(time.time() * 1000))
         
         # Create message: userid + api_key + nonce
         message = user_id + self.api_key + nonce
