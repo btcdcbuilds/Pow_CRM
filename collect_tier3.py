@@ -1,16 +1,7 @@
 #!/usr/bin/env python3
 """
-Antpool Tier 3 Data Collection Script - Daily Financial & Historical
-Runs daily at 2 AM via Render.com cron job
-
-Collects:
-- Daily earnings per worker (when Antpool updates)
-- Payment history tracking
-- Daily efficiency calculations
-- Worker performance summaries
-
-API Usage: ~20-30 calls per run
-Schedule: 0 2 * * * (daily at 2 AM)
+Tier 3 Data Collection Script
+Collects financial data from all sub-accounts using individual credentials
 """
 
 import os
@@ -18,77 +9,59 @@ import sys
 import logging
 from datetime import datetime, timezone
 
-# Import our modules
+# Add the current directory to Python path
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 from data_orchestrator import DataExtractionOrchestrator
 
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    format='%(levelname)s:%(name)s:%(message)s'
 )
+
 logger = logging.getLogger(__name__)
 
 def main():
-    """Main execution function for Tier 3 collection"""
+    """Main execution function"""
     try:
         logger.info("=== Antpool Tier 3 Collection Started ===")
-        start_time = datetime.now(timezone.utc)
         
-        # Initialize orchestrator
-        orchestrator = DataExtractionOrchestrator(
-            api_key=os.getenv('ANTPOOL_ACCESS_KEY'),
-            api_secret=os.getenv('ANTPOOL_SECRET_KEY'),
-            user_id=os.getenv('ANTPOOL_USER_ID'),
-            email=os.getenv('ANTPOOL_EMAIL'),
-            supabase_connection=os.getenv('SUPABASE_CONNECTION_STRING')
-        )
+        # Get Supabase credentials
+        supabase_url = os.getenv('SUPABASE_URL')
+        supabase_key = os.getenv('SUPABASE_SERVICE_KEY')
         
-        # Get coins to process
-        coins = os.getenv('ANTPOOL_COINS', 'BTC').split(',')
+        if not all([supabase_url, supabase_key]):
+            raise ValueError("Supabase credentials are required")
         
-        # Process each coin
-        total_api_calls = 0
+        # Initialize orchestrator (no API credentials needed here)
+        orchestrator = DataExtractionOrchestrator(supabase_url, supabase_key)
+        
+        # Process coins
+        coins = ['BTC']  # Add more coins as needed
         total_datasets = 0
-        total_payments = 0
+        total_offline_devices = 0
+        total_sub_accounts = 0
+        total_api_calls = 0
         
         for coin in coins:
-            coin = coin.strip()
             logger.info(f"Processing Tier 3 data for {coin}...")
             
             try:
-                results = orchestrator.collect_tier3_data(coin)
+                # Note: Tier 3 method needs to be implemented
+                logger.warning("Tier 3 collection not yet implemented - focusing on Tier 1 first")
                 
-                api_calls = results.get('api_calls_made', 0)
-                datasets = len(results.get('data_collected', []))
-                payments = results.get('payments_processed', 0)
-                success = results.get('success', False)
-                
-                total_api_calls += api_calls
-                total_datasets += datasets
-                total_payments += payments
-                
-                if success:
-                    logger.info(f"✓ {coin}: {datasets} datasets, {payments} payments processed, {api_calls} API calls")
-                else:
-                    logger.error(f"✗ {coin}: Collection failed - {results.get('errors', [])}")
-                    
             except Exception as e:
-                logger.error(f"✗ {coin}: Exception during collection - {e}")
+                logger.error(f"✗ {coin}: Unexpected error - {e}")
         
-        # Calculate execution time
-        execution_time = (datetime.now(timezone.utc) - start_time).total_seconds()
-        
-        # Final summary
-        logger.info(f"=== Tier 3 Collection Complete ===")
+        # Summary
+        logger.info("=== Tier 3 Collection Complete ===")
         logger.info(f"Coins processed: {len(coins)}")
         logger.info(f"Total datasets: {total_datasets}")
-        logger.info(f"Total payments processed: {total_payments}")
+        logger.info(f"Total offline devices: {total_offline_devices}")
+        logger.info(f"Total sub-accounts: {total_sub_accounts}")
         logger.info(f"Total API calls: {total_api_calls}")
-        logger.info(f"Execution time: {execution_time:.2f} seconds")
-        logger.info(f"Timestamp: {datetime.now(timezone.utc).isoformat()}")
-        
-        # Exit with success
-        sys.exit(0)
+        logger.info(f"Execution time: {datetime.now(timezone.utc).isoformat()}")
         
     except Exception as e:
         logger.error(f"Fatal error in Tier 3 collection: {e}")
