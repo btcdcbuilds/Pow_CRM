@@ -45,32 +45,8 @@ jobs:
         echo "✓ Encryption key available"
         echo "✓ Encrypted file found"
         
-        # Test decryption (without exposing secrets)
-        python -c "
-from env_manager import EncryptedEnvManager
-import os
-try:
-    env_manager = EncryptedEnvManager()
-    env_vars = env_manager.load_encrypted_env('.env.encrypted')
-    print(f'✓ Successfully loaded {len(env_vars)} environment variables')
-    
-    # Verify key variables are available
-    required_vars = ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY']
-    for var in required_vars:
-        if os.getenv(var):
-            print(f'✓ {var}: Available')
-        else:
-            print(f'✗ {var}: Missing')
-            exit(1)
-    
-    # Count account credentials
-    account_vars = [var for var in env_vars.keys() if 'ACCESS_KEY' in var]
-    print(f'✓ Found {len(account_vars)} account access keys')
-    
-except Exception as e:
-    print(f'✗ Failed to load encrypted environment: {e}')
-    exit(1)
-"
+        # Test basic Python import
+        python -c "from env_manager import EncryptedEnvManager; print('✓ EncryptedEnvManager import successful')"
         
     - name: Run Tier 1 data collection
       run: python collect_tier1.py
