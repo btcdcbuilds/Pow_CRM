@@ -24,14 +24,32 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         
+    - name: Verify encrypted environment setup
+      env:
+        ENV_ENCRYPTION_KEY: ${{ secrets.ENV_ENCRYPTION_KEY }}
+      run: |
+        echo "Verifying encrypted environment setup..."
+        
+        # Check if encryption key is available
+        if [ -z "$ENV_ENCRYPTION_KEY" ]; then
+          echo "ERROR: ENV_ENCRYPTION_KEY not found in secrets"
+          exit 1
+        fi
+        
+        # Check if encrypted file exists
+        if [ ! -f ".env.encrypted" ]; then
+          echo "ERROR: .env.encrypted file not found"
+          exit 1
+        fi
+        
+        echo "✓ Encryption key available"
+        echo "✓ Encrypted file found"
+        
     - name: Run Tier 4 cleanup
       run: python collect_tier4.py
       env:
-        ANTPOOL_ACCESS_KEY: ${{ secrets.ANTPOOL_ACCESS_KEY }}
-        ANTPOOL_SECRET_KEY: ${{ secrets.ANTPOOL_SECRET_KEY }}
-        ANTPOOL_USER_ID: ${{ secrets.ANTPOOL_USER_ID }}
-        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-        SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        # Encryption key for .env file
+        ENV_ENCRYPTION_KEY: ${{ secrets.ENV_ENCRYPTION_KEY }}
         
     - name: Log completion
       run: echo "Tier 4 data cleanup completed at $(date)"

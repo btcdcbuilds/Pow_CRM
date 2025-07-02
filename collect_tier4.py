@@ -12,6 +12,19 @@ from datetime import datetime, timezone
 # Add the current directory to Python path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
+# CRITICAL FIX: Import and load encrypted environment FIRST
+from env_manager import EncryptedEnvManager
+
+# Load encrypted environment variables
+try:
+    env_manager = EncryptedEnvManager()
+    env_vars = env_manager.load_encrypted_env('.env.encrypted')
+    logging.info(f"Successfully loaded {len(env_vars)} environment variables from encrypted file")
+except Exception as e:
+    logging.error(f"Failed to load encrypted environment: {e}")
+    # Fallback to regular environment variables (for local development)
+    logging.warning("Falling back to regular environment variables")
+
 from data_orchestrator import DataExtractionOrchestrator
 
 # Configure logging

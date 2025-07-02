@@ -24,33 +24,59 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         
-    - name: Load encrypted environment variables
-      run: |
-        python -c "
-        from env_manager import EncryptedEnvManager
-        import os
-        
-        # Load encrypted .env file
-        encryption_key = os.getenv('ENV_ENCRYPTION_KEY')
-        if encryption_key and os.path.exists('.env.encrypted'):
-            manager = EncryptedEnvManager(encryption_key)
-            env_vars = manager.load_encrypted_env('.env.encrypted')
-            print(f'Loaded {len(env_vars)} environment variables from encrypted file')
-        else:
-            print('Using GitHub secrets fallback')
-        "
+    - name: Verify encrypted environment setup
       env:
         ENV_ENCRYPTION_KEY: ${{ secrets.ENV_ENCRYPTION_KEY }}
+      run: |
+        echo "Verifying encrypted environment setup..."
+        
+        # Check if encryption key is available
+        if [ -z "$ENV_ENCRYPTION_KEY" ]; then
+          echo "ERROR: ENV_ENCRYPTION_KEY not found in secrets"
+          exit 1
+        fi
+        
+        # Check if encrypted file exists
+        if [ ! -f ".env.encrypted" ]; then
+          echo "ERROR: .env.encrypted file not found"
+          exit 1
+        fi
+        
+        echo "✓ Encryption key available"
+        echo "✓ Encrypted file found"
+        
+        # Test decryption (without exposing secrets)
+        python -c "
+from env_manager import EncryptedEnvManager
+import os
+try:
+    env_manager = EncryptedEnvManager()
+    env_vars = env_manager.load_encrypted_env('.env.encrypted')
+    print(f'✓ Successfully loaded {len(env_vars)} environment variables')
+    
+    # Verify key variables are available
+    required_vars = ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY']
+    for var in required_vars:
+        if os.getenv(var):
+            print(f'✓ {var}: Available')
+        else:
+            print(f'✗ {var}: Missing')
+            exit(1)
+    
+    # Count account credentials
+    account_vars = [var for var in env_vars.keys() if 'ACCESS_KEY' in var]
+    print(f'✓ Found {len(account_vars)} account access keys')
+    
+except Exception as e:
+    print(f'✗ Failed to load encrypted environment: {e}')
+    exit(1)
+"
         
     - name: Run Tier 1 data collection
       run: python collect_tier1.py
       env:
         # Encryption key for .env file
         ENV_ENCRYPTION_KEY: ${{ secrets.ENV_ENCRYPTION_KEY }}
-        
-        # Supabase credentials (fallback if not in .env)
-        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-        SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         
     - name: Log completion
       run: echo "Tier 1 data collection completed at $(date)"
