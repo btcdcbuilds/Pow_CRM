@@ -35,8 +35,8 @@ def main():
         
         # Initialize orchestrator
         orchestrator = DataExtractionOrchestrator(
-            api_key=os.getenv('ANTPOOL_API_KEY'),
-            api_secret=os.getenv('ANTPOOL_API_SECRET'),
+            api_key=os.getenv('ANTPOOL_ACCESS_KEY'),
+            api_secret=os.getenv('ANTPOOL_SECRET_KEY'),
             user_id=os.getenv('ANTPOOL_USER_ID'),
             email=os.getenv('ANTPOOL_EMAIL'),
             supabase_connection=os.getenv('SUPABASE_CONNECTION_STRING')
