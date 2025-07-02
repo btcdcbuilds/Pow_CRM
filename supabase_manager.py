@@ -405,13 +405,22 @@ class SupabaseManager:
     
     def insert_hashrate(self, account_id: int, coin: str, hashrate_data: Dict) -> bool:
         """Insert hashrate data"""
+        # Convert decimal strings to integers for BIGINT columns
+        def safe_int(value):
+            if value is None:
+                return 0
+            try:
+                return int(float(str(value)))
+            except (ValueError, TypeError):
+                return 0
+        
         hashrate_record = {
             'account_id': account_id,
             'coin_type': coin,
-            'hashrate_10m': hashrate_data.get('last10m'),
-            'hashrate_1h': hashrate_data.get('last1h'),
-            'hashrate_1d': hashrate_data.get('last1d'),
-            'worker_count': hashrate_data.get('totalWorkers'),
+            'hashrate_10m': safe_int(hashrate_data.get('last10m')),
+            'hashrate_1h': safe_int(hashrate_data.get('last1h')),
+            'hashrate_1d': safe_int(hashrate_data.get('last1d')),
+            'worker_count': safe_int(hashrate_data.get('totalWorkers')),
             'created_at': datetime.now(timezone.utc).isoformat()
         }
         return self.insert_data('hashrates', hashrate_record)
