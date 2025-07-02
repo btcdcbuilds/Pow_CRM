@@ -24,177 +24,33 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         
+    - name: Load encrypted environment variables
+      run: |
+        python -c "
+        from env_manager import EncryptedEnvManager
+        import os
+        
+        # Load encrypted .env file
+        encryption_key = os.getenv('ENV_ENCRYPTION_KEY')
+        if encryption_key and os.path.exists('.env.encrypted'):
+            manager = EncryptedEnvManager(encryption_key)
+            env_vars = manager.load_encrypted_env('.env.encrypted')
+            print(f'Loaded {len(env_vars)} environment variables from encrypted file')
+        else:
+            print('Using GitHub secrets fallback')
+        "
+      env:
+        ENV_ENCRYPTION_KEY: ${{ secrets.ENV_ENCRYPTION_KEY }}
+        
     - name: Run Tier 1 data collection
       run: python collect_tier1.py
       env:
-        # Supabase credentials
+        # Encryption key for .env file
+        ENV_ENCRYPTION_KEY: ${{ secrets.ENV_ENCRYPTION_KEY }}
+        
+        # Supabase credentials (fallback if not in .env)
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-        
-        # POWDigital3
-        POWDIGITAL3_ACCESS_KEY: ${{ secrets.POWDIGITAL3_ACCESS_KEY }}
-        POWDIGITAL3_SECRET_KEY: ${{ secrets.POWDIGITAL3_SECRET_KEY }}
-        POWDIGITAL3_USER_ID: ${{ secrets.POWDIGITAL3_USER_ID }}
-        
-        # PNGMiningEth
-        PNGMININGETH_ACCESS_KEY: ${{ secrets.PNGMININGETH_ACCESS_KEY }}
-        PNGMININGETH_SECRET_KEY: ${{ secrets.PNGMININGETH_SECRET_KEY }}
-        PNGMININGETH_USER_ID: ${{ secrets.PNGMININGETH_USER_ID }}
-        
-        # PedroEth
-        PEDROETH_ACCESS_KEY: ${{ secrets.PEDROETH_ACCESS_KEY }}
-        PEDROETH_SECRET_KEY: ${{ secrets.PEDROETH_SECRET_KEY }}
-        PEDROETH_USER_ID: ${{ secrets.PEDROETH_USER_ID }}
-        
-        # KennDunk
-        KENNDUNK_ACCESS_KEY: ${{ secrets.KENNDUNK_ACCESS_KEY }}
-        KENNDUNK_SECRET_KEY: ${{ secrets.KENNDUNK_SECRET_KEY }}
-        KENNDUNK_USER_ID: ${{ secrets.KENNDUNK_USER_ID }}
-        
-        # YZMining
-        YZMINING_ACCESS_KEY: ${{ secrets.YZMINING_ACCESS_KEY }}
-        YZMINING_SECRET_KEY: ${{ secrets.YZMINING_SECRET_KEY }}
-        YZMINING_USER_ID: ${{ secrets.YZMINING_USER_ID }}
-        
-        # SVJMining
-        SVJMINING_ACCESS_KEY: ${{ secrets.SVJMINING_ACCESS_KEY }}
-        SVJMINING_SECRET_KEY: ${{ secrets.SVJMINING_SECRET_KEY }}
-        SVJMINING_USER_ID: ${{ secrets.SVJMINING_USER_ID }}
-        
-        # ZTuneMining
-        ZTUNEMINING_ACCESS_KEY: ${{ secrets.ZTUNEMINING_ACCESS_KEY }}
-        ZTUNEMINING_SECRET_KEY: ${{ secrets.ZTUNEMINING_SECRET_KEY }}
-        ZTUNEMINING_USER_ID: ${{ secrets.ZTUNEMINING_USER_ID }}
-        
-        # BMasterMining
-        BMASTERMINING_ACCESS_KEY: ${{ secrets.BMASTERMINING_ACCESS_KEY }}
-        BMASTERMINING_SECRET_KEY: ${{ secrets.BMASTERMINING_SECRET_KEY }}
-        BMASTERMINING_USER_ID: ${{ secrets.BMASTERMINING_USER_ID }}
-        
-        # Allin3
-        ALLIN3_ACCESS_KEY: ${{ secrets.ALLIN3_ACCESS_KEY }}
-        ALLIN3_SECRET_KEY: ${{ secrets.ALLIN3_SECRET_KEY }}
-        ALLIN3_USER_ID: ${{ secrets.ALLIN3_USER_ID }}
-        
-        # Mack81
-        MACK81_ACCESS_KEY: ${{ secrets.MACK81_ACCESS_KEY }}
-        MACK81_SECRET_KEY: ${{ secrets.MACK81_SECRET_KEY }}
-        MACK81_USER_ID: ${{ secrets.MACK81_USER_ID }}
-        
-        # CanKann2
-        CANKANN2_ACCESS_KEY: ${{ secrets.CANKANN2_ACCESS_KEY }}
-        CANKANN2_SECRET_KEY: ${{ secrets.CANKANN2_SECRET_KEY }}
-        CANKANN2_USER_ID: ${{ secrets.CANKANN2_USER_ID }}
-        
-        # PedroMining
-        PEDROMINING_ACCESS_KEY: ${{ secrets.PEDROMINING_ACCESS_KEY }}
-        PEDROMINING_SECRET_KEY: ${{ secrets.PEDROMINING_SECRET_KEY }}
-        PEDROMINING_USER_ID: ${{ secrets.PEDROMINING_USER_ID }}
-        
-        # VanMining
-        VANMINING_ACCESS_KEY: ${{ secrets.VANMINING_ACCESS_KEY }}
-        VANMINING_SECRET_KEY: ${{ secrets.VANMINING_SECRET_KEY }}
-        VANMINING_USER_ID: ${{ secrets.VANMINING_USER_ID }}
-        
-        # LasVegasMining
-        LASVEGASMINING_ACCESS_KEY: ${{ secrets.LASVEGASMINING_ACCESS_KEY }}
-        LASVEGASMINING_SECRET_KEY: ${{ secrets.LASVEGASMINING_SECRET_KEY }}
-        LASVEGASMINING_USER_ID: ${{ secrets.LASVEGASMINING_USER_ID }}
-        
-        # CanKann
-        CANKANN_ACCESS_KEY: ${{ secrets.CANKANN_ACCESS_KEY }}
-        CANKANN_SECRET_KEY: ${{ secrets.CANKANN_SECRET_KEY }}
-        CANKANN_USER_ID: ${{ secrets.CANKANN_USER_ID }}
-        
-        # PNGMining
-        PNGMINING_ACCESS_KEY: ${{ secrets.PNGMINING_ACCESS_KEY }}
-        PNGMINING_SECRET_KEY: ${{ secrets.PNGMINING_SECRET_KEY }}
-        PNGMINING_USER_ID: ${{ secrets.PNGMINING_USER_ID }}
-        
-        # Rarcoa
-        RARCOA_ACCESS_KEY: ${{ secrets.RARCOA_ACCESS_KEY }}
-        RARCOA_SECRET_KEY: ${{ secrets.RARCOA_SECRET_KEY }}
-        RARCOA_USER_ID: ${{ secrets.RARCOA_USER_ID }}
-        
-        # Soltero
-        SOLTERO_ACCESS_KEY: ${{ secrets.SOLTERO_ACCESS_KEY }}
-        SOLTERO_SECRET_KEY: ${{ secrets.SOLTERO_SECRET_KEY }}
-        SOLTERO_USER_ID: ${{ secrets.SOLTERO_USER_ID }}
-        
-        # BillMiningBR
-        BILLMININGBR_ACCESS_KEY: ${{ secrets.BILLMININGBR_ACCESS_KEY }}
-        BILLMININGBR_SECRET_KEY: ${{ secrets.BILLMININGBR_SECRET_KEY }}
-        BILLMININGBR_USER_ID: ${{ secrets.BILLMININGBR_USER_ID }}
-        
-        # POWDigital2
-        POWDIGITAL2_ACCESS_KEY: ${{ secrets.POWDIGITAL2_ACCESS_KEY }}
-        POWDIGITAL2_SECRET_KEY: ${{ secrets.POWDIGITAL2_SECRET_KEY }}
-        POWDIGITAL2_USER_ID: ${{ secrets.POWDIGITAL2_USER_ID }}
-        
-        # BlackDawn
-        BLACKDAWN_ACCESS_KEY: ${{ secrets.BLACKDAWN_ACCESS_KEY }}
-        BLACKDAWN_SECRET_KEY: ${{ secrets.BLACKDAWN_SECRET_KEY }}
-        BLACKDAWN_USER_ID: ${{ secrets.BLACKDAWN_USER_ID }}
-        
-        # Manggornmoo
-        MANGGORNMOO_ACCESS_KEY: ${{ secrets.MANGGORNMOO_ACCESS_KEY }}
-        MANGGORNMOO_SECRET_KEY: ${{ secrets.MANGGORNMOO_SECRET_KEY }}
-        MANGGORNMOO_USER_ID: ${{ secrets.MANGGORNMOO_USER_ID }}
-        
-        # Lasvegasmining2
-        LASVEGASMINING2_ACCESS_KEY: ${{ secrets.LASVEGASMINING2_ACCESS_KEY }}
-        LASVEGASMINING2_SECRET_KEY: ${{ secrets.LASVEGASMINING2_SECRET_KEY }}
-        LASVEGASMINING2_USER_ID: ${{ secrets.LASVEGASMINING2_USER_ID }}
-        
-        # 50Shades
-        FIFTYSHADES_ACCESS_KEY: ${{ secrets.FIFTYSHADES_ACCESS_KEY }}
-        FIFTYSHADES_SECRET_KEY: ${{ secrets.FIFTYSHADES_SECRET_KEY }}
-        FIFTYSHADES_USER_ID: ${{ secrets.FIFTYSHADES_USER_ID }}
-        
-        # NsxR
-        NSXR_ACCESS_KEY: ${{ secrets.NSXR_ACCESS_KEY }}
-        NSXR_SECRET_KEY: ${{ secrets.NSXR_SECRET_KEY }}
-        NSXR_USER_ID: ${{ secrets.NSXR_USER_ID }}
-        
-        # BlockwareSA
-        BLOCKWARESA_ACCESS_KEY: ${{ secrets.BLOCKWARESA_ACCESS_KEY }}
-        BLOCKWARESA_SECRET_KEY: ${{ secrets.BLOCKWARESA_SECRET_KEY }}
-        BLOCKWARESA_USER_ID: ${{ secrets.BLOCKWARESA_USER_ID }}
-        
-        # RarcoaSA
-        RARCOASA_ACCESS_KEY: ${{ secrets.RARCOASA_ACCESS_KEY }}
-        RARCOASA_SECRET_KEY: ${{ secrets.RARCOASA_SECRET_KEY }}
-        RARCOASA_USER_ID: ${{ secrets.RARCOASA_USER_ID }}
-        
-        # VanminingSA
-        VANMININGSA_ACCESS_KEY: ${{ secrets.VANMININGSA_ACCESS_KEY }}
-        VANMININGSA_SECRET_KEY: ${{ secrets.VANMININGSA_SECRET_KEY }}
-        VANMININGSA_USER_ID: ${{ secrets.VANMININGSA_USER_ID }}
-        
-        # BillminingSA
-        BILLMININGSA_ACCESS_KEY: ${{ secrets.BILLMININGSA_ACCESS_KEY }}
-        BILLMININGSA_SECRET_KEY: ${{ secrets.BILLMININGSA_SECRET_KEY }}
-        BILLMININGSA_USER_ID: ${{ secrets.BILLMININGSA_USER_ID }}
-        
-        # Allin2
-        ALLIN2_ACCESS_KEY: ${{ secrets.ALLIN2_ACCESS_KEY }}
-        ALLIN2_SECRET_KEY: ${{ secrets.ALLIN2_SECRET_KEY }}
-        ALLIN2_USER_ID: ${{ secrets.ALLIN2_USER_ID }}
-        
-        # TylerDSA
-        TYLERDSA_ACCESS_KEY: ${{ secrets.TYLERDSA_ACCESS_KEY }}
-        TYLERDSA_SECRET_KEY: ${{ secrets.TYLERDSA_SECRET_KEY }}
-        TYLERDSA_USER_ID: ${{ secrets.TYLERDSA_USER_ID }}
-        
-        # GoldenDawn
-        GOLDENDAWN_ACCESS_KEY: ${{ secrets.GOLDENDAWN_ACCESS_KEY }}
-        GOLDENDAWN_SECRET_KEY: ${{ secrets.GOLDENDAWN_SECRET_KEY }}
-        GOLDENDAWN_USER_ID: ${{ secrets.GOLDENDAWN_USER_ID }}
-        
-        # POWDigital
-        POWDIGITAL_ACCESS_KEY: ${{ secrets.POWDIGITAL_ACCESS_KEY }}
-        POWDIGITAL_SECRET_KEY: ${{ secrets.POWDIGITAL_SECRET_KEY }}
-        POWDIGITAL_USER_ID: ${{ secrets.POWDIGITAL_USER_ID }}
         
     - name: Log completion
       run: echo "Tier 1 data collection completed at $(date)"
