@@ -15,6 +15,7 @@ from typing import Dict, List, Any, Optional
 
 from antpool_client import AntpoolClient
 from supabase_manager import SupabaseManager
+from sub_accounts import SUB_ACCOUNT_IDS, DEFAULT_USER_ID
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -58,10 +59,10 @@ class DataExtractionOrchestrator:
     def collect_tier1_data(self, coin: str = 'BTC') -> Dict[str, Any]:
         """
         Tier 1: Dashboard Essentials (Every 10 minutes)
-        - Main pool info (balance, total hashrate, earnings)
-        - Sub-account summaries  
-        - Offline device detection only
-        API Usage: ~5-8 calls
+        - Pool stats for network info
+        - All sub-account balances and hashrates
+        - Offline device detection
+        API Usage: ~35-40 calls (1 pool + 33 accounts + 33 hashrates)
         """
         results = {
             'success': True,
@@ -75,97 +76,59 @@ class DataExtractionOrchestrator:
         try:
             logger.info("=== Tier 1 Collection Started ===")
             
-            # Get main account
-            main_account_id = self._get_or_create_account(self.user_id, 'main')
-            
-            # 1. Main account balance and earnings
-            logger.info("Collecting main account balance...")
-            balance_data = self.client.get_account_balance(coin=coin)
-            if balance_data:
-                self.db.insert_account_balance(main_account_id, balance_data)
-                results['data_collected'].append('main_account_balance')
-            results['api_calls_made'] += 1
-            
-            # 2. Main account total hashrate
-            logger.info("Collecting main account hashrate...")
-            hashrate_data = self.client.get_hashrate(coin)
-            if hashrate_data:
-                self.db.insert_hashrate(main_account_id, coin, hashrate_data)
-                results['data_collected'].append('main_account_hashrate')
-            results['api_calls_made'] += 1
-            
-            # 3. Sub-accounts summary (if email provided)
-            if self.email:
-                logger.info("Collecting sub-account summaries...")
-                sub_accounts = self.client.get_sub_account_list(self.email)
+            # 1. Get pool stats for network info
+            logger.info("Collecting pool statistics...")
+            try:
+                pool_data = self.client.get_pool_stats(coin=coin)
+                if pool_data:
+                    # Store pool stats in database
+                    self.db.insert_pool_stats(pool_data, coin)
+                    results['data_collected'].append('pool_stats')
                 results['api_calls_made'] += 1
-                
-                if sub_accounts and 'data' in sub_accounts:
-                    for sub_account in sub_accounts['data']:
-                        sub_user_id = sub_account.get('userName', '')
-                        if sub_user_id:
-                            # Create/get sub-account
-                            sub_account_id = self._get_or_create_account(
-                                sub_user_id, 'sub', main_account_id
-                            )
-                            
-                            # Sub-account balance
-                            sub_balance = self.client.get_sub_account_balance(sub_user_id)
-                            if sub_balance:
-                                self.db.insert_account_balance(sub_account_id, sub_balance)
-                                results['data_collected'].append(f'sub_balance_{sub_user_id}')
-                            results['api_calls_made'] += 1
-                            
-                            # Sub-account hashrate
-                            sub_hashrate = self.client.get_sub_account_hashrate(sub_user_id, coin)
-                            if sub_hashrate:
-                                self.db.insert_hashrate(sub_account_id, coin, sub_hashrate)
-                                results['data_collected'].append(f'sub_hashrate_{sub_user_id}')
-                            results['api_calls_made'] += 1
-                            
-                            results['sub_accounts_processed'] += 1
+            except Exception as e:
+                logger.error(f"Failed to get pool stats: {e}")
+                results['errors'].append(f"Pool stats error: {e}")
             
-            # 4. Quick offline device detection (main account only)
-            logger.info("Checking for offline devices...")
-            worker_status = self.client.get_worker_status(coin)
-            results['api_calls_made'] += 1
+            # 2. Process all sub-accounts
+            logger.info(f"Processing {len(SUB_ACCOUNT_IDS)} sub-accounts...")
             
-            if worker_status and 'data' in worker_status:
-                offline_count = 0
-                total_workers = len(worker_status['data'])
-                
-                for worker in worker_status['data']:
-                    if worker.get('worker_status') == 'Dead':
-                        offline_device = {
-                            'worker_name': worker.get('worker_name'),
-                            'last_share_time': worker.get('last_share_time'),
-                            'account_id': main_account_id,
-                            'detected_at': datetime.now(timezone.utc)
-                        }
-                        results['offline_devices'].append(offline_device)
+            for user_id in SUB_ACCOUNT_IDS:
+                try:
+                    # Create/get account in database
+                    account_id = self._get_or_create_account(user_id, 'sub')
+                    
+                    # Get account balance
+                    logger.info(f"Collecting balance for {user_id}...")
+                    balance_data = self.client.get_account_balance(user_id=user_id, coin=coin)
+                    if balance_data:
+                        self.db.insert_account_balance(account_id, balance_data)
+                        results['data_collected'].append(f'{user_id}_balance')
+                    results['api_calls_made'] += 1
+                    
+                    # Get hashrate data
+                    logger.info(f"Collecting hashrate for {user_id}...")
+                    hashrate_data = self.client.get_hashrate(user_id=user_id, coin=coin)
+                    if hashrate_data:
+                        self.db.insert_hashrate(account_id, coin, hashrate_data)
+                        results['data_collected'].append(f'{user_id}_hashrate')
                         
-                        # Store offline alert
-                        self.db.create_worker_alert(
-                            main_account_id,
-                            worker.get('worker_name'),
-                            'offline',
-                            f"Worker {worker.get('worker_name')} is offline",
-                            'critical'
-                        )
-                        offline_count += 1
-                
-                # Store pool statistics
-                pool_stats = {
-                    'total_workers': total_workers,
-                    'offline_workers': offline_count,
-                    'online_workers': total_workers - offline_count,
-                    'offline_percentage': (offline_count / total_workers * 100) if total_workers > 0 else 0
-                }
-                self.db.insert_pool_stat(main_account_id, coin, pool_stats)
-                results['data_collected'].append('pool_statistics')
+                        # Check for offline workers
+                        if hashrate_data.get('activeWorkers', 0) == 0 and hashrate_data.get('totalWorkers', 0) > 0:
+                            results['offline_devices'].append({
+                                'account': user_id,
+                                'total_workers': hashrate_data.get('totalWorkers', 0),
+                                'active_workers': 0
+                            })
+                    results['api_calls_made'] += 1
+                    
+                    results['sub_accounts_processed'] += 1
+                    
+                except Exception as e:
+                    logger.error(f"Failed to process {user_id}: {e}")
+                    results['errors'].append(f"{user_id}: {e}")
             
-            logger.info(f"Tier 1 completed: {len(results['data_collected'])} datasets, "
-                       f"{results['api_calls_made']} API calls, {len(results['offline_devices'])} offline devices")
+            results['success'] = len(results['errors']) == 0
+            logger.info(f"Tier 1 complete: {results['sub_accounts_processed']} accounts, {results['api_calls_made']} API calls")
             
         except Exception as e:
             logger.error(f"Tier 1 collection failed: {e}")
