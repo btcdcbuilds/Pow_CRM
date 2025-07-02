@@ -1,32 +1,6 @@
-name: Tier 1 - Dashboard Data Collection
+# Environment variables for GitHub Actions workflow
+# Add this to the 'env:' section of tier1-dashboard.yml
 
-on:
-  schedule:
-    # Runs every 10 minutes
-    - cron: '*/10 * * * *'
-  workflow_dispatch:  # Allows manual triggering
-
-jobs:
-  collect-dashboard-data:
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-        
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        
-    - name: Run Tier 1 data collection
-      run: python collect_tier1.py
-      env:
         # Supabase credentials
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
@@ -195,7 +169,4 @@ jobs:
         POWDIGITAL_ACCESS_KEY: ${{ secrets.POWDIGITAL_ACCESS_KEY }}
         POWDIGITAL_SECRET_KEY: ${{ secrets.POWDIGITAL_SECRET_KEY }}
         POWDIGITAL_USER_ID: ${{ secrets.POWDIGITAL_USER_ID }}
-        
-    - name: Log completion
-      run: echo "Tier 1 data collection completed at $(date)"
 
