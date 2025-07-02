@@ -72,18 +72,21 @@ class AntpoolAuth:
         Get complete authentication parameters for API request
         
         Args:
-            user_id: User ID for the request
+            user_id: Target user ID for the request (for sub-accounts)
             coin: Coin type (BTC, LTC, ETH, ZEC)
             additional_params: Additional parameters to include
             
         Returns:
             Complete parameter dictionary for API request
         """
-        auth_params = self.generate_signature(user_id)
+        # Always use main account user_id for signature generation
+        auth_params = self.generate_signature(self.user_id)
         auth_params['coin'] = coin
         
+        # If requesting data for a specific sub-account, add userId parameter
         if user_id and user_id != self.user_id:
             auth_params['userId'] = user_id
+            # Some endpoints use clientUserId instead
             auth_params['clientUserId'] = user_id
         
         if additional_params:

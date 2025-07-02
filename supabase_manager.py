@@ -388,3 +388,55 @@ class SupabaseManager:
 # Import required for cleanup functions
 from datetime import timedelta
 
+
+    # ========================
+    # MISSING METHODS NEEDED BY DATA ORCHESTRATOR
+    # ========================
+    
+    def insert_pool_stats(self, pool_data: Dict, coin: str) -> bool:
+        """Insert pool statistics data"""
+        pool_stats = {
+            'coin_type': coin,
+            'pool_hashrate': pool_data.get('poolHashrate'),
+            'active_worker_number': pool_data.get('activeWorkerNumber'),
+            'pool_status': pool_data.get('poolStatus'),
+            'network_diff': pool_data.get('networkDiff'),
+            'estimate_time': pool_data.get('estimateTime'),
+            'current_round': pool_data.get('currentRound'),
+            'total_share_number': pool_data.get('totalShareNumber'),
+            'total_block_number': pool_data.get('totalBlockNumber'),
+            'created_at': datetime.now(timezone.utc).isoformat()
+        }
+        return self.insert_data('pool_statistics', pool_stats)
+    
+    def insert_account_balance(self, account_id: int, balance_data: Dict) -> bool:
+        """Insert account balance data"""
+        balance_record = {
+            'account_id': account_id,
+            'earn_24_hours': balance_data.get('earn24Hours'),
+            'earn_total': balance_data.get('earnTotal'),
+            'paid_out': balance_data.get('paidOut'),
+            'balance': balance_data.get('balance'),
+            'settle_time': balance_data.get('settleTime'),
+            'created_at': datetime.now(timezone.utc).isoformat()
+        }
+        return self.insert_data('account_balances', balance_record)
+    
+    def insert_hashrate(self, account_id: int, coin: str, hashrate_data: Dict) -> bool:
+        """Insert hashrate data"""
+        hashrate_record = {
+            'account_id': account_id,
+            'coin_type': coin,
+            'last_10m': hashrate_data.get('last10m'),
+            'last_1h': hashrate_data.get('last1h'),
+            'last_1d': hashrate_data.get('last1d'),
+            'accepted': hashrate_data.get('accepted'),
+            'stale': hashrate_data.get('stale'),
+            'duplicate': hashrate_data.get('dupelicate'),  # Note: API has typo
+            'other': hashrate_data.get('other'),
+            'total_workers': hashrate_data.get('totalWorkers'),
+            'active_workers': hashrate_data.get('activeWorkers'),
+            'created_at': datetime.now(timezone.utc).isoformat()
+        }
+        return self.insert_data('hashrates', hashrate_record)
+
