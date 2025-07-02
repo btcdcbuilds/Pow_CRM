@@ -27,8 +27,10 @@ jobs:
     - name: Run Tier 3 data collection
       run: python collect_tier3.py
       env:
-        ANTPOOL_ACCESS_KEY: ${{ secrets.ANTPOOL_ACCESS_KEY }}
-        ANTPOOL_SECRET_KEY: ${{ secrets.ANTPOOL_SECRET_KEY }}
+        ANTPOOL_API_KEY: ${{ secrets.ANTPOOL_ACCESS_KEY }}
+        ANTPOOL_API_SECRET: ${{ secrets.ANTPOOL_SECRET_KEY }}
+        ANTPOOL_USER_ID: ${{ secrets.ANTPOOL_USER_ID }}
+        ANTPOOL_EMAIL: ${{ secrets.ANTPOOL_EMAIL }}
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         
