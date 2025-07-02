@@ -24,8 +24,8 @@ class AntpoolAuth:
             api_secret: Antpool API secret
             user_id: Main account user ID
         """
-        self.api_key = api_key or os.getenv('ANTPOOL_API_KEY')
-        self.api_secret = api_secret or os.getenv('ANTPOOL_API_SECRET')
+        self.api_key = api_key or os.getenv('ANTPOOL_ACCESS_KEY')
+        self.api_secret = api_secret or os.getenv('ANTPOOL_SECRET_KEY')
         self.user_id = user_id or os.getenv('ANTPOOL_USER_ID')
         
         if not all([self.api_key, self.api_secret, self.user_id]):
