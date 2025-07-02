@@ -59,10 +59,9 @@ class DataExtractionOrchestrator:
     def collect_tier1_data(self, coin: str = 'BTC') -> Dict[str, Any]:
         """
         Tier 1: Dashboard Essentials (Every 10 minutes)
-        - Pool stats for network info
         - All sub-account balances and hashrates
-        - Offline device detection
-        API Usage: ~35-40 calls (1 pool + 33 accounts + 33 hashrates)
+        - Simple and focused data collection
+        API Usage: ~66 calls (33 accounts + 33 hashrates)
         """
         results = {
             'success': True,
@@ -76,20 +75,7 @@ class DataExtractionOrchestrator:
         try:
             logger.info("=== Tier 1 Collection Started ===")
             
-            # 1. Get pool stats for network info
-            logger.info("Collecting pool statistics...")
-            try:
-                pool_data = self.client.get_pool_stats(coin=coin)
-                if pool_data:
-                    # Store pool stats in database
-                    self.db.insert_pool_stats(pool_data, coin)
-                    results['data_collected'].append('pool_stats')
-                results['api_calls_made'] += 1
-            except Exception as e:
-                logger.error(f"Failed to get pool stats: {e}")
-                results['errors'].append(f"Pool stats error: {e}")
-            
-            # 2. Process all sub-accounts
+            # Process all sub-accounts
             logger.info(f"Processing {len(SUB_ACCOUNT_IDS)} sub-accounts...")
             
             for user_id in SUB_ACCOUNT_IDS:

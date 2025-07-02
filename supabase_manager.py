@@ -385,27 +385,9 @@ class SupabaseManager:
             logger.error(f"Error getting statistics: {e}")
             return {}
 
-# Import required for cleanup functions
-from datetime import timedelta
-
-
     # ========================
     # MISSING METHODS NEEDED BY DATA ORCHESTRATOR
     # ========================
-    
-    def insert_pool_stats(self, pool_data: Dict, coin: str) -> bool:
-        """Insert pool statistics data"""
-        pool_stats = {
-            'coin_type': coin,
-            'pool_hashrate': pool_data.get('poolHashrate'),
-            'total_workers': pool_data.get('activeWorkerNumber'),  # Using active workers as total
-            'online_workers': pool_data.get('activeWorkerNumber'),
-            'offline_workers': 0,  # Calculate if needed
-            'network_difficulty': pool_data.get('networkDiff'),
-            'data_frequency': '10min',
-            'created_at': datetime.now(timezone.utc).isoformat()
-        }
-        return self.insert_data('pool_stats', pool_stats)
     
     def insert_account_balance(self, account_id: int, balance_data: Dict) -> bool:
         """Insert account balance data"""
@@ -433,4 +415,8 @@ from datetime import timedelta
             'created_at': datetime.now(timezone.utc).isoformat()
         }
         return self.insert_data('hashrates', hashrate_record)
+
+
+# Import required for cleanup functions
+from datetime import timedelta
 
