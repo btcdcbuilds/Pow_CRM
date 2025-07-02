@@ -214,6 +214,24 @@ class SupabaseManager:
             return self.get_account_id(account_data['account_name'])
         return None
     
+    def upsert_account(self, account_data: Dict) -> Optional[int]:
+        """Create or update account and return ID"""
+        # Check if account already exists
+        existing_id = self.get_account_id(account_data['account_name'])
+        
+        if existing_id:
+            # Update existing account
+            filters = {'account_name': account_data['account_name']}
+            account_data['updated_at'] = datetime.now(timezone.utc).isoformat()
+            if self.update_data('accounts', filters, account_data):
+                return existing_id
+            return None
+        else:
+            # Create new account
+            account_data['created_at'] = datetime.now(timezone.utc).isoformat()
+            account_data['updated_at'] = datetime.now(timezone.utc).isoformat()
+            return self.create_account(account_data)
+    
     def save_account_balance(self, account_id: int, balance_data: Dict) -> bool:
         """Save account balance data"""
         balance_data['account_id'] = account_id
