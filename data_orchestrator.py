@@ -198,20 +198,29 @@ class DataExtractionOrchestrator:
                     client = AntpoolClient(api_key=api_key, api_secret=api_secret, user_id=user_id)
                     account_id = self._get_or_create_account(account_name, 'sub')
                     
-                    # Get account overview
-                    logger.debug(f"Collecting overview for {account_name}...")
+                    # Get worker list (account overview replacement)
+                    logger.debug(f"Collecting worker overview for {account_name}...")
                     call_start = time.time()
-                    overview_data = client.get_account_overview(user_id=user_id, coin=coin)
+                    worker_data = client.get_worker_list(user_id=user_id, coin=coin, worker_status=0, page=1, page_size=50)
                     call_time = int((time.time() - call_start) * 1000)
                     
-                    if overview_data and overview_data.get('code') == 0:
-                        self.db.insert_account_overview(account_id, coin, overview_data['data'])
+                    if worker_data and worker_data.get('code') == 0:
+                        # Extract overview data from worker list response
+                        data = worker_data.get('data', {})
+                        overview_data = {
+                            'total_workers': data.get('result', {}).get('totalRecord', 0),
+                            'active_workers': len([w for w in data.get('result', {}).get('rows', []) if w.get('hsLast10min', '0') != '0 TH/s']),
+                            'coin_type': data.get('coinType', coin),
+                            'user_id': data.get('userId', user_id),
+                            'worker_summary': data.get('result', {})
+                        }
+                        self.db.insert_account_overview(account_id, coin, overview_data)
                         results['data_collected'].append(f'{account_name}_overview')
-                        self._log_api_call('/api/accountOverview.htm', account_id, 200, call_time)
+                        self._log_api_call('/api/userWorkerList.htm', account_id, 200, call_time)
                     else:
-                        error_msg = overview_data.get('message', 'Unknown error') if overview_data else 'No response'
-                        self._log_api_call('/api/accountOverview.htm', account_id, 400, call_time, error_msg)
-                        results['errors'].append(f'{account_name}: Overview error - {error_msg}')
+                        error_msg = worker_data.get('message', 'Unknown error') if worker_data else 'No response'
+                        self._log_api_call('/api/userWorkerList.htm', account_id, 400, call_time, error_msg)
+                        results['errors'].append(f'{account_name}: Worker overview error - {error_msg}')
                     
                     results['api_calls_made'] += 1
                     results['sub_accounts_processed'] += 1
