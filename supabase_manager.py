@@ -97,25 +97,22 @@ class SupabaseManager:
             raise
     
     def insert_account_overview(self, account_id: int, coin_type: str, overview_data: Dict[str, Any]):
-        """Insert account overview data from /api/accountOverview.htm"""
+        """Insert account overview data - fixed to match actual schema"""
         try:
+            # Only insert fields that actually exist in the user's schema
             data = {
                 'account_id': account_id,
                 'coin_type': coin_type,
-                'hashrate_10m': int(overview_data.get('hsLast10m', 0)),
-                'hashrate_1h': int(overview_data.get('hsLast1h', 0)),
-                'hashrate_1d': int(overview_data.get('hsLast1d', 0)),
-                'total_workers': int(overview_data.get('totalWorkerNum', 0)),
-                'active_workers': int(overview_data.get('activeWorkerNum', 0)),
-                'inactive_workers': int(overview_data.get('inactiveWorkerNum', 0)),
-                'invalid_workers': int(overview_data.get('invalidWorkerNum', 0)),
-                'total_amount': float(overview_data.get('totalAmount', 0)),
-                'unpaid_amount': float(overview_data.get('unpaidAmount', 0)),
-                'yesterday_amount': float(overview_data.get('yesterdayAmount', 0))
+                'total_workers': int(overview_data.get('total_workers', 0)),
+                'active_workers': int(overview_data.get('active_workers', 0)),
+                'inactive_workers': int(overview_data.get('inactive_workers', 0)),
+                'invalid_workers': int(overview_data.get('invalid_workers', 0)),
+                'user_id': overview_data.get('user_id'),
+                'worker_summary': overview_data.get('worker_summary')
             }
             
             response = self.client.table('account_overview').insert(data).execute()
-            logger.debug(f"Inserted overview for account {account_id}")
+            logger.debug(f"Inserted overview for account {account_id}: {data['total_workers']} total, {data['active_workers']} active workers")
             return response.data[0]['id'] if response.data else None
         except Exception as e:
             logger.error(f"Failed to insert overview for account {account_id}: {e}")
