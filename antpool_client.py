@@ -279,6 +279,70 @@ class AntpoolClient:
                                          additional_params=additional_params)
         return self._make_request('worker_list', params)
     
+    def get_all_workers(self, user_id: str, coin: str = 'BTC', worker_status: int = 0) -> Dict:
+        """
+        Get ALL workers across all pages (handles pagination automatically)
+        
+        Args:
+            user_id: User ID
+            coin: Coin type
+            worker_status: 0=All, 1=online, 2=offline, 3=invalid
+            
+        Returns:
+            Complete worker data with all workers from all pages
+        """
+        all_workers = []
+        page = 1
+        total_pages = 1
+        total_records = 0
+        api_calls_made = 0
+        
+        logger.info(f"Starting to fetch ALL workers for {user_id}...")
+        
+        while page <= total_pages:
+            try:
+                logger.debug(f"Fetching page {page} for {user_id}")
+                response = self.get_worker_list(user_id, coin, worker_status, page, 50)
+                api_calls_made += 1
+                
+                if not response or 'rows' not in response:
+                    logger.warning(f"No worker data in response for {user_id} page {page}")
+                    break
+                
+                # Add workers from this page
+                page_workers = response.get('rows', [])
+                all_workers.extend(page_workers)
+                
+                # Update pagination info from first response
+                if page == 1:
+                    total_pages = response.get('totalPage', 1)
+                    total_records = response.get('totalRecord', 0)
+                    logger.info(f"Found {total_records} total workers across {total_pages} pages for {user_id}")
+                
+                logger.debug(f"Page {page}: Got {len(page_workers)} workers")
+                page += 1
+                
+                # Small delay between pages to be respectful to API
+                if page <= total_pages:
+                    time.sleep(0.5)
+                    
+            except Exception as e:
+                logger.error(f"Error fetching page {page} for {user_id}: {e}")
+                break
+        
+        result = {
+            'workers': all_workers,
+            'total_workers': len(all_workers),
+            'total_pages_fetched': page - 1,
+            'total_records_expected': total_records,
+            'api_calls_made': api_calls_made,
+            'user_id': user_id,
+            'coin': coin
+        }
+        
+        logger.info(f"✅ Completed fetching workers for {user_id}: {len(all_workers)}/{total_records} workers from {page-1}/{total_pages} pages")
+        return result
+    
     def get_hashrate_chart(self, user_id: str = None, worker_id: str = None,
                           coin: str = 'BTC', chart_type: int = 1, 
                           start_date: str = None) -> Dict:
