@@ -204,21 +204,21 @@ class DataExtractionOrchestrator:
                     worker_data = client.get_worker_list(user_id=user_id, coin=coin, worker_status=0, page=1, page_size=50)
                     call_time = int((time.time() - call_start) * 1000)
                     
-                    if worker_data and worker_data.get('code') == 0:
-                        # Extract overview data from worker list response
-                        data = worker_data.get('data', {})
+                    if worker_data and isinstance(worker_data, dict) and 'result' in worker_data:
+                        # Worker list returns data directly without code/message fields
                         overview_data = {
-                            'total_workers': data.get('result', {}).get('totalRecord', 0),
-                            'active_workers': len([w for w in data.get('result', {}).get('rows', []) if w.get('hsLast10min', '0') != '0 TH/s']),
-                            'coin_type': data.get('coinType', coin),
-                            'user_id': data.get('userId', user_id),
-                            'worker_summary': data.get('result', {})
+                            'total_workers': worker_data.get('result', {}).get('totalRecord', 0),
+                            'active_workers': len([w for w in worker_data.get('result', {}).get('rows', []) if w.get('hsLast10min', '0') != '0 TH/s']),
+                            'coin_type': worker_data.get('coinType', coin),
+                            'user_id': worker_data.get('userId', user_id),
+                            'worker_summary': worker_data.get('result', {})
                         }
                         self.db.insert_account_overview(account_id, coin, overview_data)
                         results['data_collected'].append(f'{account_name}_overview')
                         self._log_api_call('/api/userWorkerList.htm', account_id, 200, call_time)
+                        logger.info(f"✅ {account_name}: {overview_data['total_workers']} total workers, {overview_data['active_workers']} active")
                     else:
-                        error_msg = worker_data.get('message', 'Unknown error') if worker_data else 'No response'
+                        error_msg = 'No worker data returned or invalid format'
                         self._log_api_call('/api/userWorkerList.htm', account_id, 400, call_time, error_msg)
                         results['errors'].append(f'{account_name}: Worker overview error - {error_msg}')
                     
