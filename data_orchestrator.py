@@ -208,7 +208,7 @@ class DataExtractionOrchestrator:
                     logger.info(f"🔄 Collecting ALL workers for {account_name}...")
                     
                     call_start = time.time()
-                    all_workers = client.get_all_workers(user_id=user_id, coin_type=coin)
+                    all_workers = client.get_all_workers(user_id=user_id, coin=coin)
                     call_time = int((time.time() - call_start) * 1000)
                     
                     if all_workers:
