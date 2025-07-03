@@ -119,33 +119,72 @@ class SupabaseManager:
             raise
     
     def insert_worker_data(self, account_id: int, coin_type: str, worker_data: Dict[str, Any], data_type: str = 'detailed'):
-        """Insert worker data from /api/userWorkerList.htm or /api/workers.htm"""
+        """Insert worker data - FIXED to work with actual schema"""
         try:
+            # Parse hashrate values (remove TH/s and convert to float)
+            def parse_hashrate(hashrate_str):
+                if not hashrate_str or hashrate_str == '0':
+                    return 0.0
+                try:
+                    # Remove units and convert to float
+                    value_str = str(hashrate_str).replace(' TH/s', '').replace(' GH/s', '').replace(' MH/s', '').replace(' H/s', '')
+                    return float(value_str)
+                except (ValueError, TypeError):
+                    return 0.0
+            
+            # Parse reject ratio (remove % and convert to float)
+            def parse_reject_ratio(ratio_str):
+                if not ratio_str:
+                    return 0.0
+                try:
+                    value_str = str(ratio_str).replace('%', '')
+                    return float(value_str)
+                except (ValueError, TypeError):
+                    return 0.0
+            
+            # Parse timestamp
+            def parse_timestamp(timestamp_str):
+                if not timestamp_str or timestamp_str == '':
+                    return None
+                try:
+                    # Handle both string and numeric timestamps
+                    if isinstance(timestamp_str, str) and timestamp_str.isdigit():
+                        timestamp_seconds = int(timestamp_str) / 1000
+                    elif isinstance(timestamp_str, (int, float)):
+                        timestamp_seconds = timestamp_str / 1000
+                    else:
+                        return None
+                    return datetime.fromtimestamp(timestamp_seconds, tz=timezone.utc).isoformat()
+                except (ValueError, TypeError, OSError):
+                    return None
+            
             # Determine worker status
             status = 'unknown'
-            if 'shareLastTime' in worker_data:
-                # From userWorkerList - determine status based on recent activity
-                last_share = worker_data.get('shareLastTime')
-                if last_share and last_share != '':
-                    status = 'online'
-                else:
-                    status = 'offline'
+            last_share = worker_data.get('shareLastTime')
+            if last_share and last_share != '':
+                status = 'online'
+            else:
+                status = 'offline'
             
+            # Parse all values properly
+            hashrate_1h = parse_hashrate(worker_data.get('hsLast1h', worker_data.get('last1h', 0)))
+            hashrate_24h = parse_hashrate(worker_data.get('hsLast1d', worker_data.get('last1d', 0)))
+            reject_rate = parse_reject_ratio(worker_data.get('rejectRatio', 0))
+            last_share_time = parse_timestamp(last_share)
+            
+            # Only include fields that exist in user's schema
             data = {
                 'account_id': account_id,
                 'coin_type': coin_type,
                 'worker_name': worker_data.get('workerId', worker_data.get('worker', 'unknown')),
                 'worker_status': status,
-                'hashrate_10m': int(worker_data.get('last10m', 0)),
-                'hashrate_1h': int(worker_data.get('last1h', worker_data.get('hsLast1h', 0))),
-                'hashrate_1d': int(worker_data.get('last1d', worker_data.get('hsLast1d', 0))),
-                'accepted_shares': int(worker_data.get('accepted', 0)),
-                'stale_shares': int(worker_data.get('stale', 0)),
-                'duplicate_shares': int(worker_data.get('dupelicate', 0)),
-                'other_shares': int(worker_data.get('other', 0)),
-                'reject_rate': float(worker_data.get('rejectRatio', 0)),
-                'last_share_time': worker_data.get('shareLastTime'),
+                'hashrate_1h': hashrate_1h,
+                'hashrate_24h': hashrate_24h,  # Map 1d to 24h field
+                'reject_rate': reject_rate,
+                'last_share_time': last_share_time,
                 'data_type': data_type
+                # REMOVED: accepted_shares, stale_shares, duplicate_shares, other_shares (don't exist in schema)
+                # REMOVED: hashrate_10m (doesn't exist in schema)
             }
             
             response = self.client.table('workers').insert(data).execute()
