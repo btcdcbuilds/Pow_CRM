@@ -175,16 +175,15 @@ class SupabaseManager:
             # Only include fields that exist in user's schema
             data = {
                 'account_id': account_id,
-                'coin_type': coin_type,
                 'worker_name': worker_data.get('workerId', worker_data.get('worker', 'unknown')),
                 'worker_status': status,
                 'hashrate_1h': hashrate_1h,
-                'hashrate_24h': hashrate_24h,  # Map 1d to 24h field
+                'hashrate_24h': hashrate_24h,
                 'reject_rate': reject_rate,
-                'last_share_time': last_share_time,
-                'data_type': data_type
-                # REMOVED: accepted_shares, stale_shares, duplicate_shares, other_shares (don't exist in schema)
-                # REMOVED: hashrate_10m (doesn't exist in schema)
+                'last_share_time': last_share_time
+                # REMOVED: coin_type (doesn't exist in schema)
+                # REMOVED: data_type (doesn't exist in schema)
+                # REMOVED: accepted_shares, stale_shares, etc. (don't exist in schema)
             }
             
             response = self.client.table('workers').insert(data).execute()
