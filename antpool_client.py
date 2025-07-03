@@ -305,18 +305,24 @@ class AntpoolClient:
                 response = self.get_worker_list(user_id, coin, worker_status, page, 50)
                 api_calls_made += 1
                 
-                if not response or 'rows' not in response:
-                    logger.warning(f"No worker data in response for {user_id} page {page}")
+                # Check if response has the expected structure
+                if not response or 'result' not in response:
+                    logger.warning(f"No result data in response for {user_id} page {page}")
+                    break
+                
+                result = response['result']
+                if 'rows' not in result:
+                    logger.warning(f"No rows in result for {user_id} page {page}")
                     break
                 
                 # Add workers from this page
-                page_workers = response.get('rows', [])
+                page_workers = result.get('rows', [])
                 all_workers.extend(page_workers)
                 
                 # Update pagination info from first response
                 if page == 1:
-                    total_pages = response.get('totalPage', 1)
-                    total_records = response.get('totalRecord', 0)
+                    total_pages = result.get('totalPage', 1)
+                    total_records = result.get('totalRecord', 0)
                     logger.info(f"Found {total_records} total workers across {total_pages} pages for {user_id}")
                 
                 logger.debug(f"Page {page}: Got {len(page_workers)} workers")
