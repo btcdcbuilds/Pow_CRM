@@ -1,9 +1,10 @@
 """
-Antpool Data Extraction Orchestrator - OPTIMIZED VERSION
+Antpool Data Extraction Orchestrator - FIXED VERSION
 Implements all 4 tiers with API rate limiting and performance optimizations
-- Reduced logging output (summary per pool instead of per worker)
+- Fixed data parsing to handle worker dictionaries correctly
 - Batch database operations for better performance
-- Optimized Tier 2 with working worker list API
+- Reduced logging output (summary per pool instead of per worker)
+- Removed non-existent properties like pages_fetched
 """
 
 import logging
@@ -49,41 +50,40 @@ class DataExtractionOrchestrator:
     
     def _log_api_call(self, endpoint: str, account_id: Optional[int] = None, 
                      status: int = 200, response_time: int = 0, error: str = None):
-        """Log API call for rate limiting (simplified)"""
+        """Log API call for rate limiting"""
         try:
             self.db.log_api_call(endpoint, account_id, status, response_time, error)
             self.api_calls_made += 1
-        except Exception:
-            pass  # Silent fail for logging
+        except Exception as e:
+            logger.warning(f"Failed to log API call: {e}")
     
     def _check_rate_limit(self) -> bool:
-        """Check if we're approaching API rate limit"""
+        """Check if we're within API rate limits"""
         if self.api_calls_made >= self.api_call_limit:
-            logger.warning(f"Approaching API rate limit ({self.api_calls_made}/{self.api_call_limit})")
+            logger.warning(f"API rate limit reached ({self.api_calls_made}/{self.api_call_limit})")
             return False
         return True
-    
+
     def collect_tier1_data(self, coin: str = 'BTC') -> Dict[str, Any]:
         """
-        Tier 1: Essential Dashboard Data (Every 10 minutes)
-        - Account balances and basic hashrates for all 33 accounts
-        - API Usage: ~66 calls (33 balance + 33 hashrate)
-        - Focus: Financial data and basic performance
+        Tier 1: Essential Dashboard Data (Every 15 minutes)
+        - Pool statistics and account balances
+        - API Usage: ~10-15 calls
+        - Focus: Critical operational data
         """
         results = {
             'success': True,
             'data_collected': [],
             'errors': [],
             'api_calls_made': 0,
-            'offline_devices': [],
-            'sub_accounts_processed': 0
+            'sub_accounts_processed': 0,
+            'offline_devices': []
         }
         
         try:
             logger.info("=== Tier 1 Collection Started ===")
             start_time = time.time()
             
-            # Get all account names
             account_names = get_all_account_names()
             logger.info(f"Processing {len(account_names)} sub-accounts for Tier 1...")
             
@@ -92,64 +92,40 @@ class DataExtractionOrchestrator:
                     break
                     
                 try:
-                    # Get credentials for this specific account
                     api_key, api_secret, user_id = get_account_credentials(account_name)
-                    
-                    # Create client with this account's credentials
                     client = AntpoolClient(api_key=api_key, api_secret=api_secret, user_id=user_id)
-                    
-                    # Create/get account in database
                     account_id = self._get_or_create_account(account_name, 'sub')
                     
-                    # 1. Get account balance (ESSENTIAL)
+                    # Get account balance
                     call_start = time.time()
                     balance_data = client.get_account_balance(user_id=user_id, coin=coin)
                     call_time = int((time.time() - call_start) * 1000)
                     
                     if balance_data and balance_data.get('code') == 0:
-                        self.db.insert_account_balance(account_id, balance_data['data'], coin)
+                        data = balance_data['data']
+                        self.db.insert_account_balance(account_id, data, coin)
                         results['data_collected'].append(f'{account_name}_balance')
                         self._log_api_call('/api/account.htm', account_id, 200, call_time)
+                        
+                        # Check for offline workers
+                        if data.get('totalWorkers', 0) > 0 and data.get('activeWorkers', 0) == 0:
+                            results['offline_devices'].append({
+                                'account_name': account_name,
+                                'total_workers': data.get('totalWorkers', 0),
+                                'active_workers': 0
+                            })
                     else:
                         error_msg = balance_data.get('message', 'Unknown error') if balance_data else 'No response'
                         self._log_api_call('/api/account.htm', account_id, 400, call_time, error_msg)
                         results['errors'].append(f'{account_name}: Balance error - {error_msg}')
                     
                     results['api_calls_made'] += 1
-                    
-                    # 2. Get hashrate data (ESSENTIAL)
-                    if self._check_rate_limit():
-                        call_start = time.time()
-                        hashrate_data = client.get_hashrate(user_id=user_id, coin=coin)
-                        call_time = int((time.time() - call_start) * 1000)
-                        
-                        if hashrate_data and hashrate_data.get('code') == 0:
-                            self.db.insert_hashrate(account_id, coin, hashrate_data['data'])
-                            results['data_collected'].append(f'{account_name}_hashrate')
-                            self._log_api_call('/api/hashrate.htm', account_id, 200, call_time)
-                            
-                            # Check for offline workers
-                            data = hashrate_data['data']
-                            if data.get('activeWorkers', 0) == 0 and data.get('totalWorkers', 0) > 0:
-                                results['offline_devices'].append({
-                                    'account': account_name,
-                                    'total_workers': data.get('totalWorkers', 0),
-                                    'active_workers': 0
-                                })
-                        else:
-                            error_msg = hashrate_data.get('message', 'Unknown error') if hashrate_data else 'No response'
-                            self._log_api_call('/api/hashrate.htm', account_id, 400, call_time, error_msg)
-                            results['errors'].append(f'{account_name}: Hashrate error - {error_msg}')
-                        
-                        results['api_calls_made'] += 1
-                    
                     results['sub_accounts_processed'] += 1
                     
-                    # Small delay to avoid overwhelming API
                     time.sleep(0.1)
                     
                 except Exception as e:
-                    logger.error(f"Failed to process {account_name}: {e}")
+                    logger.error(f"Failed to process {account_name} in Tier 1: {e}")
                     results['errors'].append(f'{account_name}: {str(e)}')
             
             execution_time = time.time() - start_time
@@ -161,8 +137,7 @@ class DataExtractionOrchestrator:
             logger.info(f"Execution time: {execution_time:.2f}s")
             
             if results['errors']:
-                logger.warning(f"Errors encountered: {len(results['errors'])}")
-                results['success'] = len(results['errors']) < len(account_names) * 0.5  # Success if <50% errors
+                results['success'] = len(results['errors']) < len(account_names) * 0.5
             
         except Exception as e:
             logger.error(f"Tier 1 collection failed: {e}")
@@ -170,13 +145,13 @@ class DataExtractionOrchestrator:
             results['errors'].append(f"Fatal error: {str(e)}")
         
         return results
-    
+
     def collect_tier2_data(self, coin: str = 'BTC') -> Dict[str, Any]:
         """
-        Tier 2: Account Overview Data (Every 30 minutes)
-        - Worker overview for all accounts (worker counts, status summary)
-        - API Usage: ~200-300 calls (pagination for all workers)
-        - Focus: Complete worker inventory and operational overview
+        Tier 2: Worker Data Collection (Every 30 minutes) - OPTIMIZED
+        - Worker list and status for all accounts
+        - API Usage: ~175 calls (pagination for large accounts)
+        - Focus: Complete worker inventory with batch operations
         """
         results = {
             'success': True,
@@ -211,13 +186,11 @@ class DataExtractionOrchestrator:
                     all_workers = client.get_all_workers(user_id=user_id, coin=coin)
                     call_time = int((time.time() - call_start) * 1000)
                     
-                    if all_workers:
+                    if all_workers and isinstance(all_workers, list):
                         worker_count = len(all_workers)
                         results['total_workers_found'] += worker_count
                         
                         # Parse and batch insert workers
-                        logger.info(f"Parsing {worker_count} workers for {account_name}...")
-                        
                         workers_data = []
                         active_workers = 0
                         inactive_workers = 0
@@ -225,6 +198,12 @@ class DataExtractionOrchestrator:
                         
                         for worker in all_workers:
                             try:
+                                # Ensure worker is a dictionary
+                                if not isinstance(worker, dict):
+                                    logger.warning(f"Worker data is not a dictionary for {account_name}: {type(worker)}")
+                                    invalid_workers += 1
+                                    continue
+                                
                                 # Parse worker data
                                 worker_data = self._parse_worker_data(worker)
                                 worker_data['account_id'] = account_id
@@ -246,7 +225,10 @@ class DataExtractionOrchestrator:
                         if workers_data:
                             stored_count = self.db.batch_insert_workers(workers_data)
                             results['workers_stored'] += stored_count
-                            logger.info(f"✅ {account_name}: {worker_count} workers ({active_workers} active) from {client.pages_fetched} pages")
+                            
+                            # Calculate pages fetched (estimate based on 50 workers per page)
+                            pages_fetched = (worker_count + 49) // 50
+                            logger.info(f"✅ {account_name}: {worker_count} workers ({active_workers} active) from {pages_fetched} pages")
                         
                         # Store account overview summary
                         overview_data = {
@@ -261,8 +243,9 @@ class DataExtractionOrchestrator:
                         self.db.insert_account_overview(account_id, coin, overview_data)
                         results['data_collected'].append(f'{account_name}_overview')
                         
-                        # Log API calls made for this account
-                        results['api_calls_made'] += client.pages_fetched
+                        # Log API calls made for this account (estimate based on pages)
+                        api_calls_for_account = max(1, (worker_count + 49) // 50)
+                        results['api_calls_made'] += api_calls_for_account
                         self._log_api_call('/api/userWorkerList.htm', account_id, 200, call_time)
                         
                     else:
@@ -279,12 +262,24 @@ class DataExtractionOrchestrator:
                     results['errors'].append(f'{account_name}: {str(e)}')
             
             execution_time = time.time() - start_time
-            logger.info(f"=== Tier 2 Collection Complete ===")
-            logger.info(f"Processed: {results['sub_accounts_processed']} accounts")
-            logger.info(f"Total workers found: {results['total_workers_found']}")
-            logger.info(f"Workers stored: {results['workers_stored']}")
-            logger.info(f"API calls: {results['api_calls_made']}")
-            logger.info(f"Execution time: {execution_time:.2f}s")
+            logger.info("=== Tier 2 Collection Complete ===")
+            
+            if results['workers_stored'] > 0:
+                logger.info("🎉 TIER 2 COLLECTION SUCCESSFUL!")
+                logger.info("📊 SUMMARY:")
+                logger.info(f"   • Accounts processed: {results['sub_accounts_processed']}")
+                logger.info(f"   • Total workers found: {results['total_workers_found']}")
+                logger.info(f"   • Workers stored: {results['workers_stored']}")
+                logger.info(f"   • API calls made: {results['api_calls_made']}")
+                logger.info(f"   • Execution time: {execution_time:.1f}s")
+                
+                if results['errors']:
+                    logger.warning(f"⚠ Partial success with {len(results['errors'])} errors")
+                else:
+                    logger.info("✅ All accounts processed successfully!")
+            else:
+                logger.error("❌ TIER 2 COLLECTION FAILED - No workers stored")
+                results['success'] = False
             
             if results['errors']:
                 results['success'] = len(results['errors']) < len(account_names) * 0.5
@@ -304,7 +299,12 @@ class DataExtractionOrchestrator:
                 # Remove 'TH/s' and convert to integer
                 value_str = value.replace(' TH/s', '').replace('TH/s', '').strip()
                 if value_str and value_str != '0':
-                    return int(float(value_str))
+                    try:
+                        return int(float(value_str))
+                    except (ValueError, TypeError):
+                        return 0
+            elif isinstance(value, (int, float)):
+                return int(value)
             return 0
         
         def parse_reject_rate(value):
@@ -312,7 +312,12 @@ class DataExtractionOrchestrator:
             if isinstance(value, str):
                 value_str = value.replace('%', '').strip()
                 if value_str:
-                    return float(value_str)
+                    try:
+                        return float(value_str)
+                    except (ValueError, TypeError):
+                        return 0.0
+            elif isinstance(value, (int, float)):
+                return float(value)
             return 0.0
         
         def parse_timestamp(value):
@@ -324,18 +329,24 @@ class DataExtractionOrchestrator:
                     return dt.isoformat()
                 except (ValueError, TypeError):
                     pass
+            elif isinstance(value, (int, float)):
+                try:
+                    dt = datetime.fromtimestamp(value, tz=timezone.utc)
+                    return dt.isoformat()
+                except (ValueError, TypeError):
+                    pass
             return None
         
-        # Map API response to database fields
+        # Map API response to database fields with safe defaults
         return {
-            'worker_name': worker.get('workerName', ''),
-            'worker_status': 'online' if worker.get('workerStatus') == 1 else 'offline',
-            'hashrate_1h': parse_hashrate(worker.get('hashrate1h', '0')),
-            'hashrate_24h': parse_hashrate(worker.get('hashrate1d', '0')),
-            'reject_rate': parse_reject_rate(worker.get('rejectRate', '0%')),
-            'last_share_time': parse_timestamp(worker.get('lastShareTime'))
+            'worker_name': worker.get('workerName', worker.get('worker_name', '')),
+            'worker_status': 'online' if worker.get('workerStatus', worker.get('worker_status', 0)) == 1 else 'offline',
+            'hashrate_1h': parse_hashrate(worker.get('hashrate1h', worker.get('hashrate_1h', '0'))),
+            'hashrate_24h': parse_hashrate(worker.get('hashrate1d', worker.get('hashrate_24h', '0'))),
+            'reject_rate': parse_reject_rate(worker.get('rejectRate', worker.get('reject_rate', '0%'))),
+            'last_share_time': parse_timestamp(worker.get('lastShareTime', worker.get('last_share_time')))
         }
-    
+
     def collect_tier3_data(self, coin: str = 'BTC') -> Dict[str, Any]:
         """
         Tier 3: Detailed Worker Data (Every 2 hours)
@@ -357,8 +368,8 @@ class DataExtractionOrchestrator:
             start_time = time.time()
             
             # Get accounts that need detailed analysis (offline workers, low hashrate, etc.)
-            problem_accounts = self._identify_problem_accounts()
-            logger.info(f"Analyzing {len(problem_accounts)} accounts with potential issues...")
+            problem_accounts = self.db.get_problem_accounts()
+            logger.info(f"Analyzing {len(problem_accounts)} problematic accounts for Tier 3...")
             
             for account_name in problem_accounts:
                 if not self._check_rate_limit():
@@ -370,6 +381,7 @@ class DataExtractionOrchestrator:
                     account_id = self._get_or_create_account(account_name, 'sub')
                     
                     # Get worker list with status
+                    logger.debug(f"Collecting worker list for {account_name}...")
                     call_start = time.time()
                     worker_data = client.get_worker_list(user_id=user_id, coin_type=coin, 
                                                        worker_status=0, page_size=50)  # All workers
@@ -387,12 +399,12 @@ class DataExtractionOrchestrator:
                     else:
                         error_msg = worker_data.get('message', 'Unknown error') if worker_data else 'No response'
                         self._log_api_call('/api/userWorkerList.htm', account_id, 400, call_time, error_msg)
-                        results['errors'].append(f'{account_name}: Worker list error - {error_msg}')
+                        results['errors'].append(f'{account_name}: Worker data error - {error_msg}')
                     
                     results['api_calls_made'] += 1
                     results['sub_accounts_processed'] += 1
                     
-                    time.sleep(0.2)  # Longer delay for detailed analysis
+                    time.sleep(0.1)
                     
                 except Exception as e:
                     logger.error(f"Failed to process {account_name} in Tier 3: {e}")
@@ -403,6 +415,7 @@ class DataExtractionOrchestrator:
             logger.info(f"Processed: {results['sub_accounts_processed']} accounts")
             logger.info(f"Workers analyzed: {results['workers_analyzed']}")
             logger.info(f"API calls: {results['api_calls_made']}")
+            logger.info(f"Data collected: {len(results['data_collected'])} datasets")
             logger.info(f"Execution time: {execution_time:.2f}s")
             
             if results['errors']:
@@ -414,14 +427,14 @@ class DataExtractionOrchestrator:
             results['errors'].append(f"Fatal error: {str(e)}")
         
         return results
-    
+
     def collect_tier4_data(self, coin: str = 'BTC') -> Dict[str, Any]:
         """
-        Tier 4: Payment History & Cleanup (Daily)
+        Tier 4: Payment History & Database Cleanup (Daily)
         - Payment history for all accounts
-        - Data cleanup and maintenance
-        - API Usage: ~100-200 calls (33 payment history + cleanup operations)
-        - Focus: Financial records and database maintenance
+        - Database maintenance and cleanup
+        - API Usage: ~100-200 calls
+        - Focus: Financial records and system maintenance
         """
         results = {
             'success': True,
@@ -438,9 +451,8 @@ class DataExtractionOrchestrator:
             start_time = time.time()
             
             account_names = get_all_account_names()
-            logger.info(f"Processing payment history for {len(account_names)} accounts...")
+            logger.info(f"Processing payment history for {len(account_names)} sub-accounts...")
             
-            # Collect payment history
             for account_name in account_names:
                 if not self._check_rate_limit():
                     break
@@ -450,45 +462,30 @@ class DataExtractionOrchestrator:
                     client = AntpoolClient(api_key=api_key, api_secret=api_secret, user_id=user_id)
                     account_id = self._get_or_create_account(account_name, 'sub')
                     
-                    # Get payout history
+                    # Get payment history
+                    logger.debug(f"Collecting payment history for {account_name}...")
                     call_start = time.time()
-                    payout_data = client.get_payment_history(coin=coin, payment_type='payout', page_size=20)
+                    payment_data = client.get_payment_history(user_id=user_id, coin=coin, page_size=50)
                     call_time = int((time.time() - call_start) * 1000)
                     
-                    if payout_data and payout_data.get('code') == 0:
-                        payouts = payout_data['data']['rows']
-                        for payout in payouts:
-                            self.db.insert_payment_history(account_id, coin, payout, 'payout')
+                    if payment_data and payment_data.get('code') == 0:
+                        payments = payment_data['data']['result']['rows']
+                        for payment in payments:
+                            self.db.insert_payment_history(account_id, coin, payment, 'daily')
                             results['payments_collected'] += 1
                         
-                        results['data_collected'].append(f'{account_name}_payouts')
-                        self._log_api_call('/api/paymentHistoryV2.htm', account_id, 200, call_time)
+                        results['data_collected'].append(f'{account_name}_payments')
+                        self._log_api_call('/api/paymentHistory.htm', account_id, 200, call_time)
+                        logger.info(f"Collected {len(payments)} payments for {account_name}")
                     else:
-                        error_msg = payout_data.get('message', 'Unknown error') if payout_data else 'No response'
-                        self._log_api_call('/api/paymentHistoryV2.htm', account_id, 400, call_time, error_msg)
-                        results['errors'].append(f'{account_name}: Payout history error - {error_msg}')
+                        error_msg = payment_data.get('message', 'Unknown error') if payment_data else 'No response'
+                        self._log_api_call('/api/paymentHistory.htm', account_id, 400, call_time, error_msg)
+                        results['errors'].append(f'{account_name}: Payment history error - {error_msg}')
                     
                     results['api_calls_made'] += 1
-                    
-                    # Get earnings history (if API calls remaining)
-                    if self._check_rate_limit():
-                        call_start = time.time()
-                        earnings_data = client.get_payment_history(coin=coin, payment_type='recv', page_size=10)
-                        call_time = int((time.time() - call_start) * 1000)
-                        
-                        if earnings_data and earnings_data.get('code') == 0:
-                            earnings = earnings_data['data']['rows']
-                            for earning in earnings:
-                                self.db.insert_payment_history(account_id, coin, earning, 'earnings')
-                                results['payments_collected'] += 1
-                            
-                            results['data_collected'].append(f'{account_name}_earnings')
-                            self._log_api_call('/api/paymentHistoryV2.htm', account_id, 200, call_time)
-                        
-                        results['api_calls_made'] += 1
-                    
                     results['sub_accounts_processed'] += 1
-                    time.sleep(0.2)
+                    
+                    time.sleep(0.1)
                     
                 except Exception as e:
                     logger.error(f"Failed to process {account_name} in Tier 4: {e}")
@@ -496,19 +493,31 @@ class DataExtractionOrchestrator:
             
             # Perform database cleanup
             logger.info("Performing database cleanup...")
-            try:
-                cleanup_results = self._perform_database_cleanup()
-                results['cleanup_results'] = cleanup_results
-                logger.info(f"Cleanup completed: {cleanup_results}")
-            except Exception as e:
-                logger.error(f"Database cleanup failed: {e}")
-                results['errors'].append(f"Cleanup error: {str(e)}")
+            
+            # Get accounts with offline workers or low hashrate from recent data
+            cleanup_results = {}
+            
+            # Cleanup old worker data
+            deleted_workers = self.db.cleanup_old_worker_data()
+            cleanup_results['deleted_workers'] = deleted_workers
+            
+            # Cleanup old API logs
+            deleted_logs = self.db.cleanup_old_api_logs()
+            cleanup_results['deleted_logs'] = deleted_logs
+            
+            # Cleanup old alerts
+            deleted_alerts = self.db.cleanup_old_alerts()
+            cleanup_results['deleted_alerts'] = deleted_alerts
+            
+            results['cleanup_results'] = cleanup_results
             
             execution_time = time.time() - start_time
             logger.info(f"=== Tier 4 Collection Complete ===")
             logger.info(f"Processed: {results['sub_accounts_processed']} accounts")
             logger.info(f"Payments collected: {results['payments_collected']}")
             logger.info(f"API calls: {results['api_calls_made']}")
+            logger.info(f"Data collected: {len(results['data_collected'])} datasets")
+            logger.info(f"Cleanup results: {cleanup_results}")
             logger.info(f"Execution time: {execution_time:.2f}s")
             
             if results['errors']:
@@ -520,40 +529,4 @@ class DataExtractionOrchestrator:
             results['errors'].append(f"Fatal error: {str(e)}")
         
         return results
-    
-    def _identify_problem_accounts(self) -> List[str]:
-        """Identify accounts that need detailed analysis based on recent data"""
-        try:
-            # Get accounts with offline workers or low hashrate from recent data
-            problem_accounts = self.db.get_problem_accounts()
-            return problem_accounts[:15]  # Limit to 15 accounts to stay under API limit
-        except Exception as e:
-            logger.error(f"Failed to identify problem accounts: {e}")
-            # Fallback: return first 10 accounts
-            return get_all_account_names()[:10]
-    
-    def _perform_database_cleanup(self) -> Dict[str, int]:
-        """Perform database cleanup operations"""
-        cleanup_results = {}
-        
-        try:
-            # Cleanup old worker data
-            deleted_workers = self.db.cleanup_old_worker_data()
-            cleanup_results['deleted_workers'] = deleted_workers
-            
-            # Cleanup old API logs
-            deleted_logs = self.db.cleanup_old_api_logs()
-            cleanup_results['deleted_api_logs'] = deleted_logs
-            
-            # Cleanup resolved alerts
-            deleted_alerts = self.db.cleanup_old_alerts()
-            cleanup_results['deleted_alerts'] = deleted_alerts
-            
-            logger.info(f"Database cleanup completed: {cleanup_results}")
-            
-        except Exception as e:
-            logger.error(f"Database cleanup failed: {e}")
-            cleanup_results['error'] = str(e)
-        
-        return cleanup_results
 
