@@ -143,7 +143,7 @@ class DataExtractionOrchestrator:
                 }
                 
                 # Store worker in database
-                self.db.insert_worker_data(account_id, 'BTC', worker, 'tier2_complete')
+                self.db.insert_worker_data(account_id, 'BTC', worker_data, 'tier2_complete')
                 workers_stored += 1
                 
             except Exception as e:
