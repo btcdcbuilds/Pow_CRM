@@ -121,16 +121,18 @@ class SupabaseManager:
     def insert_worker_data(self, account_id: int, coin_type: str, worker_data: Dict[str, Any], data_type: str = 'detailed'):
         """Insert worker data - FIXED to work with actual schema"""
         try:
-            # Parse hashrate values (remove TH/s and convert to float)
+            # Parse hashrate values (remove TH/s and convert to integer for BIGINT fields)
             def parse_hashrate(hashrate_str):
                 if not hashrate_str or hashrate_str == '0':
-                    return 0.0
+                    return 0
                 try:
-                    # Remove units and convert to float
+                    # Remove units and convert to float first, then to int
                     value_str = str(hashrate_str).replace(' TH/s', '').replace(' GH/s', '').replace(' MH/s', '').replace(' H/s', '')
-                    return float(value_str)
+                    value_float = float(value_str)
+                    # Convert to integer for BIGINT database fields
+                    return int(value_float)
                 except (ValueError, TypeError):
-                    return 0.0
+                    return 0
             
             # Parse reject ratio (remove % and convert to float)
             def parse_reject_ratio(ratio_str):
