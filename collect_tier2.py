@@ -22,7 +22,7 @@ env_manager = EncryptedEnvManager()
 env_manager.load_encrypted_env('.env.encrypted')
 
 # Import optimized components
-from data_orchestrator_optimized import DataExtractionOrchestrator
+from data_orchestrator import DataExtractionOrchestrator
 
 # Configure logging for clean output
 logging.basicConfig(
