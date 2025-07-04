@@ -377,6 +377,16 @@ class DataExtractionOrchestrator:
             if results['errors']:
                 results['success'] = len(results['errors']) < len(account_names) * 0.5
             
+            # Print success summary
+            if results['success'] and results['total_workers_stored'] > 0:
+                logger.info("🎉 TIER 2 COLLECTION SUCCESSFUL!")
+                logger.info("📊 SUMMARY:")
+                logger.info(f"   • Accounts processed: {results['sub_accounts_processed']}")
+                logger.info(f"   • Total workers found: {results['total_workers_found']}")
+                logger.info(f"   • Workers stored: {results['total_workers_stored']}")
+                logger.info(f"   • API calls made: {results['api_calls_made']}")
+                logger.info(f"   • Execution time: {execution_time:.1f}s")
+            
         except Exception as e:
             logger.error(f"Tier 2 collection failed: {e}")
             results['success'] = False
